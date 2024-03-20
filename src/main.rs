@@ -1,15 +1,13 @@
 mod db;
 mod websocket;
 
-use tokio::net::TcpListener;
 use tokio::sync::broadcast;
 use tokio_postgres::NoTls;
-use websocket::start_websocket_server;
 
 #[tokio::main]
 async fn main() {
     let addr = "127.0.0.1:8080";
-    let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
+    let listener = tokio::net::TcpListener::bind(&addr).await.expect("Failed to bind");
     println!("Server running on {}", addr);
 
     let (tx, _) = broadcast::channel(10);
@@ -19,5 +17,5 @@ async fn main() {
     let client = db::connect_to_database().await;
 
     // Start WebSocket server
-    start_websocket_server(listener, tx, max_capacity, client).await;
+    websocket::start_websocket_server(listener, tx, max_capacity, client).await;
 }

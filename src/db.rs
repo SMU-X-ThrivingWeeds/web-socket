@@ -1,27 +1,18 @@
-use tokio_postgres::{NoTls, Config, Client};
+use tokio_postgres::{NoTls, Config};
 
-pub async fn connect_to_database() -> Client {
-    let (client, connection) = Config::new()
-        .user("your_username")
-        .password("your_password")
-        .host("localhost")
-        .port(5432)
-        .dbname("your_database")
-        .connect(NoTls)
+pub async fn connect_to_database() -> tokio_postgres::Client {
+    let config_str = "postgres://postgres.wovuoddicfjlfzrysyuy:5%tu82@cFmH8KH*@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres";
+    
+    let (client, connection) = Config::from_str(config_str, NoTls)
+        .connect()
         .await
         .expect("Failed to connect to database");
-
-    tokio::spawn(connection);
+    
+    tokio::spawn(connection.map(|res| {
+        if let Err(e) = res {
+            eprintln!("Connection error: {}", e);
+        }
+    }));
 
     client
-}
-
-pub async fn fetch_barcodes(client: &Client) -> Vec<String> {
-    let mut barcodes = Vec::new();
-    let rows = client.query("SELECT barcode FROM Bottles", &[]).await.expect("Failed to query database");
-    for row in rows {
-        let barcode: String = row.get(0);
-        barcodes.push(barcode);
-    }
-    barcodes
 }
