@@ -1,21 +1,32 @@
-mod db;
-mod websocket;
+use simple_websockets::{Event, Responder};
+use std::collections::HashMap;
 
-use tokio::sync::broadcast;
-use tokio_postgres::NoTls;
+fn main() {
+    // listen for WebSockets on port 8080:
+    let event_hub = simple_websockets::launch(8080)
+        .expect("failed to listen on port 8080");
+    // map between client ids and the client's `Responder`:
+    let mut clients: HashMap<u64, Responder> = HashMap::new();
 
-#[tokio::main]
-async fn main() {
-    let addr = "127.0.0.1:8080";
-    let listener = tokio::net::TcpListener::bind(&addr).await.expect("Failed to bind");
-    println!("Server running on {}", addr);
-
-    let (tx, _) = broadcast::channel(10);
-    let max_capacity = RwLock::new(100); // Initial value of max capacity
-
-    // Connect to the PostgreSQL database
-    let client = db::connect_to_database().await;
-
-    // Start WebSocket server
-    websocket::start_websocket_server(listener, tx, max_capacity, client).await;
+    loop {
+        match event_hub.poll_event() {
+            Event::Connect(client_id, responder) => {
+                println!("A client connected with id #{}", client_id);
+                // add their Responder to our `clients` map:
+                clients.insert(client_id, responder);
+            },
+            Event::Disconnect(client_id) => {
+                println!("Client #{} disconnected.", client_id);
+                // remove the disconnected client from the clients map:
+                clients.remove(&client_id);
+            },
+            Event::Message(client_id, message) => {
+                println!("Received a message from client #{}: {:?}", client_id, message);
+                // retrieve this client's `Responder`:
+                let responder = clients.get(&client_id).unwrap();
+                // echo the message back:
+                responder.send(message);
+            },
+        }
+    }
 }
